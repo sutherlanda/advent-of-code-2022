@@ -1,14 +1,13 @@
-module Day2.Part2 (runPart2) where
+module Day2.Part2 (run) where
 
 import Data.Maybe (fromJust)
-import Text.Printf (printf)
 
 data Shape = Rock | Paper | Scissors
 
 data Outcome = Win | Loss | Tie
 
-runPart2 :: IO ()
-runPart2 = do
+run :: IO ()
+run = do
   putStrLn "Running Day 2, Part 2 solution..."
   strategyGuide <- readInputFile
   let score = sum $ map decodeAndScore strategyGuide

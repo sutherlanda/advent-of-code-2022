@@ -1,12 +1,12 @@
-module Day3.Part2 (runPart2) where
+module Day3.Part2 (run) where
 
 import Data.Char (ord)
 import Data.List (intersect)
 import Data.List.Split
 import Data.Maybe (fromJust)
 
-runPart2 :: IO ()
-runPart2 = do
+run :: IO ()
+run = do
   putStrLn "Running Day 3, Part 2 solution..."
   knapSacks <- readInputFile
   let total = sum $ map priorityOfCommonItem . chunksOf 3 $ knapSacks
