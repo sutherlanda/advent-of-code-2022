@@ -22,6 +22,7 @@
           p.dotenv
           p.wai
           p.warp
+          p.split
         ];
 
         projectLib = import nix-projects;
