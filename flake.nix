@@ -1,11 +1,10 @@
 {
-  description = "Haskell development template";
+  description = "Advent of Code 2022";
 
   inputs = {
     nixpkgs = { url = github:nixos/nixpkgs/nixpkgs-unstable; };
     flake-utils = { url = github:numtide/flake-utils; };
     nix-projects = { url = github:sutherlanda/nix-projects; };
-    #nix-projects = { url = path:/Users/andrewsutherland/projects/nix-projects; };
   };
 
   outputs = { self, nixpkgs, flake-utils, nix-projects, ... }:
@@ -34,7 +33,7 @@
 
         haskellProjectConfigs = [
           rec {
-            name = "project-name";
+            name = "aoc";
             projectRoot = "${rootPath}/${name}";
             srcDir = "${projectRoot}/src";
             executables = {
