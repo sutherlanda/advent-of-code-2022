@@ -10,7 +10,9 @@ import qualified Day5.Part1
 import qualified Day5.Part2
 import qualified Day6.Part1
 import qualified Day6.Part2
+import qualified Day7.Part1
+import qualified Day7.Part2
 
 main :: IO ()
 main = do
-  Day6.Part2.run
+  Day7.Part2.run
