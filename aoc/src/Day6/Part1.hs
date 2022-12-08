@@ -1,7 +1,6 @@
 module Day6.Part1 (run) where
 
 import Data.List.Split (splitOn)
-import Debug.Trace (traceShow)
 
 run :: IO ()
 run = do
@@ -15,4 +14,3 @@ process = snd . last . takeWhile (\(str, _) -> length str < 4) . scanl reader ("
     reader (prev, totalCount) char
       | char `elem` prev = ((splitOn [char] prev !! 1) ++ [char], totalCount + 1)
       | otherwise = (prev ++ [char], totalCount + 1)
-    getFrom str c = splitOn c str
