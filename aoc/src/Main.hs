@@ -1,5 +1,7 @@
 import qualified Day1.Part1
 import qualified Day1.Part2
+import qualified Day10.Part1
+import qualified Day10.Part2
 import qualified Day2.Part1
 import qualified Day2.Part2
 import qualified Day3.Part1
@@ -19,4 +21,4 @@ import qualified Day9.Part2
 
 main :: IO ()
 main = do
-  Day9.Part2.run
+  Day10.Part2.run

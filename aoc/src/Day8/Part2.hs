@@ -1,8 +1,5 @@
 module Day8.Part2 (run) where
 
-import Data.List (find, isPrefixOf)
-import Data.Maybe (fromJust)
-
 type Grid = [[Height]]
 
 type Coordinates = (Int, Int)

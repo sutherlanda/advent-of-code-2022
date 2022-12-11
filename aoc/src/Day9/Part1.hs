@@ -1,8 +1,7 @@
 module Day9.Part1 (run) where
 
-import Data.List (find, isPrefixOf)
 import Data.List.Split (splitOn)
-import Data.Maybe (fromJust, mapMaybe)
+import Data.Maybe (mapMaybe)
 
 type Coordinates = (Int, Int)
 

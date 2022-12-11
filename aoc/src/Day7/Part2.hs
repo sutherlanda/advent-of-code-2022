@@ -1,8 +1,6 @@
 module Day7.Part2 (run) where
 
-import Data.HashMap.Internal.Strict (size)
-import Data.List (find, isPrefixOf)
-import Data.Maybe (fromJust)
+import Data.List (isPrefixOf)
 
 type Name = String
 
