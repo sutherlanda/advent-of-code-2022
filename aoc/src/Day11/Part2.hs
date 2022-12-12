@@ -3,7 +3,6 @@ module Day11.Part2 (run) where
 import Data.Char (isSpace)
 import Data.List (sort, sortBy)
 import Data.List.Split (splitOn, splitWhen)
-import Debug.Trace (traceShow)
 
 type Index = Int
 
@@ -33,8 +32,8 @@ run = do
   let groups = splitWhen (null . trim) input
   let monkeys = reverse $ foldl processMonkey [] groups
   let monkeyLCM = foldl1 lcm $ map (\(Monkey _ _ _ (_, divisor, _, _) _) -> divisor) monkeys
-  let after20Rounds = last $ take 10001 $ iterate (\m -> foldl (inspect monkeyLCM) m [0 .. length monkeys - 1]) monkeys
-  let monkeyActivity = map (\(Monkey _ _ _ _ count) -> count) after20Rounds
+  let inspectionsComplete = last $ take 10001 $ iterate (\m -> foldl (inspect monkeyLCM) m [0 .. length monkeys - 1]) monkeys
+  let monkeyActivity = map (\(Monkey _ _ _ _ count) -> count) inspectionsComplete
   let (mostActive : secondMostActive : _) = reverse $ sort monkeyActivity
   print (mostActive * secondMostActive)
 
