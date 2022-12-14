@@ -54,18 +54,12 @@ dijkstras grid visited distances =
       let neighbourDistance = distances !! y' !! x'
       if tempDistance < neighbourDistance then updateMatrix tempDistance coords distances else distances
 
-smallestUnvisitedDistanceIndex :: Visited -> Distances -> (Int, Int)
+smallestUnvisitedDistanceIndex :: Visited -> Distances -> Coordinates
 smallestUnvisitedDistanceIndex visited distances = indexOfMinimum zippedVisitedDistance
   where
     zippedVisitedDistance = zipWith zip distances visited
 
-minDistance :: [[Int]] -> Int
-minDistance a = mod numLines $ fromJust $ elemIndex (foldl1' min flattenedA) flattenedA
-  where
-    flattenedA = concat a
-    numLines = length a
-
-indexOfMinimum :: [[(Int, Bool)]] -> (Int, Int)
+indexOfMinimum :: [[(Int, Bool)]] -> Coordinates
 indexOfMinimum visitedAndDistances = (x, y)
   where
     flattened = concat visitedAndDistances
@@ -80,7 +74,7 @@ updateMatrix value coords@(x, y) matrix = take y matrix ++ [updatedLine] ++ drop
     originalLine = matrix !! y
     updatedLine = take x originalLine ++ [value] ++ drop (x + 1) originalLine
 
-getTraversableNeighbours :: Coordinates -> Visited -> Grid -> [(Int, Int)]
+getTraversableNeighbours :: Coordinates -> Visited -> Grid -> [Coordinates]
 getTraversableNeighbours coords@(x, y) visited grid = catMaybes [north, east, south, west]
   where
     getHeight (x', y') = getTerrainHeight (grid !! y' !! x')
@@ -102,5 +96,5 @@ getTerrainHeight c =
     'E' -> 26
     _ -> ord c - 96
 
-getCoords :: Char -> Grid -> Maybe (Int, Int)
+getCoords :: Char -> Grid -> Maybe Coordinates
 getCoords c grid = listToMaybe [(x, y) | (y, line) <- zip [0 ..] grid, x <- elemIndices c line]

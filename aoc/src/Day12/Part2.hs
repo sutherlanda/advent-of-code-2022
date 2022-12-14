@@ -60,12 +60,6 @@ smallestUnvisitedDistanceIndex visited distances = indexOfMinimum zippedVisitedD
   where
     zippedVisitedDistance = zipWith zip distances visited
 
-minDistance :: [[Int]] -> Int
-minDistance a = mod numLines $ fromJust $ elemIndex (foldl1' min flattenedA) flattenedA
-  where
-    flattenedA = concat a
-    numLines = length a
-
 indexOfMinimum :: [[(Int, Bool)]] -> Coordinates
 indexOfMinimum visitedAndDistances = (x, y)
   where
