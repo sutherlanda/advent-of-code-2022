@@ -46,7 +46,7 @@ run = do
   let modelWithRocks = foldl (updateModel Rock) model rockCoords
   let modelWithFloor = addFloor modelWithRocks
   let completeModel = dropUntilAbyss modelWithFloor
-  putStrLn $ "This may take awhile..."
+  putStrLn "This may take awhile..."
   putStrLn $ "Amount of sand: " ++ show (countSand completeModel)
 
 readInputFile :: IO [String]
