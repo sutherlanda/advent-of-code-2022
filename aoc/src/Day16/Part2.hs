@@ -6,7 +6,7 @@ module Day16.Part2 where
 
 import Control.Monad.State
 import Data.Graph (dfs)
-import Data.List (concatMap, find, intersect)
+import Data.List (concatMap, find, intersect, maximumBy)
 import qualified Data.Map.Strict as M
 import Data.Maybe (fromJust, fromMaybe, mapMaybe)
 import qualified Data.Sequence as Seq
@@ -40,40 +40,45 @@ run = do
   putStrLn "Running Day 16, Part 2 solution..."
   input <- readInputFile
   let c@(Cave rooms) = makeCave input
+  let roomMasterSet = S.fromList (map roomName (filter (\Room {..} -> roomPressureRate > 0) rooms))
   let startRoom = fromJust $ getRoom c "AA"
   let initState = CaveState c M.empty 0 startRoom
-  let mapping = M.filterWithKey (\CaveState {..} p -> p > 850) $ paths' (distMap c) initState -- Hack to limit search space. We know that each player will need to release at least 850 pressure based on previous run results. Probably a better way to do this.
-  let pairs = makePairs $ M.toList mapping
-  let r = filter (\(t1@(s1, _), t2@(s2, _)) -> openValveRooms s1 == openValveRooms s2) pairs
-  let r2 = filter (\(t1@(s1, _), t2@(s2, _)) -> null (openValveRooms s1 `intersect` openValveRooms s2)) pairs
-  print $ maximum $ map (\((_, p1), (_, p2)) -> p1 + p2) r2
-  return ()
+  let maxPressuresForValveSets = paths (distMap c) initState
+  let optimalSingleAgent = maximumBy (\(_, v1) (_, v2) -> v1 `compare` v2) $ M.toList maxPressuresForValveSets
+  let remainingValves = S.difference roomMasterSet (fst optimalSingleAgent)
+  -- Depending on if the single agent optimal solution would be able to turn all valves, this changes the problem slightly.
+  -- If the optimal single agent solution did not turn all valves in the time limit, we need to check the max pressures for aall possible subsets of the remaining valves
+  -- If the optimal single agent solution did turn all valves, then we need to compare each optimal valve set with it's complement and take the maximum result.
+  if not (S.null remainingValves)
+    then do
+      let possibleRemainingValveSets = map S.fromList $ subsets $ S.toList remainingValves
+      print $ maximum $ map (+ snd optimalSingleAgent) (mapMaybe (`M.lookup` maxPressuresForValveSets) possibleRemainingValveSets)
+    else do
+      let complementSets = map (S.difference roomMasterSet) (M.keys maxPressuresForValveSets)
+      let zippedSets = zip (M.keys maxPressuresForValveSets) complementSets
+      print $ maximum $ mapMaybe (\(s1, s2) -> (+) <$> M.lookup s1 maxPressuresForValveSets <*> M.lookup s2 maxPressuresForValveSets) zippedSets
 
-openValveRooms :: CaveState -> [String]
-openValveRooms CaveState {..} = map roomName $ M.keys roomsWithOpenValves
+subsets :: [a] -> [[a]]
+subsets [] = [[]]
+subsets (x : xs) = subsets xs ++ map (x :) (subsets xs)
+
+openValveSet :: CaveState -> S.Set String
+openValveSet CaveState {..} = S.fromList $ map roomName $ M.keys roomsWithOpenValves
 
 readInputFile :: IO String
 readInputFile = readFile "aoc/src/Day16/input.txt"
 
-paths' :: DistanceMap -> CaveState -> M.Map CaveState Int
-paths' distanceMap s = execState (dfs s) M.empty
+paths :: DistanceMap -> CaveState -> M.Map (S.Set String) Int
+paths distanceMap st = execState (dfs st) M.empty
   where
     dfs st' =
       let cache Nothing = Just pres
           cache (Just oldPres) = Just (max pres oldPres)
           pres = pressureReleased st'
        in do
-            modify $ M.alter cache st'
+            modify $ M.alter cache (openValveSet st')
             let nexts = possibleNextStates st' distanceMap
             mapM_ dfs nexts
-
-paths :: DistanceMap -> CaveState -> [Int]
-paths distanceMap s = dfs
-  where
-    dfs =
-      case possibleNextStates s distanceMap of
-        [] -> [pressureReleased s]
-        xs -> concatMap (paths distanceMap) xs
 
 pressureReleased :: CaveState -> Int
 pressureReleased caveState@CaveState {..} = M.foldlWithKey calc 0 roomsWithOpenValves
