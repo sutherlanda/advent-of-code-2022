@@ -1,13 +1,24 @@
 {-# LANGUAGE RecordWildCards #-}
 
-module Day17.Part1 where
+--[># LANGUAGE TupleSections #<]
 
+module Day17.Part2 where
+
+import Control.Monad.State
 import Data.Bifunctor (bimap, first, second)
+import qualified Data.Hashable as H
 import Data.List (concatMap, findIndex, intersperse)
+import Data.List.Split (splitOn)
+import qualified Data.Map as M
 import Data.Maybe (fromMaybe, isNothing, mapMaybe)
+import qualified Data.Sequence as Seq
+import Debug.Trace (traceShow)
 
 data Shape = Minus | Plus | BackwardsL | VLine | Block
-  deriving (Show)
+  deriving (Show, Eq, Ord)
+
+instance H.Hashable Shape where
+  hashWithSalt s shape = H.hashWithSalt s (show shape)
 
 data Rock = Rock
   { rockShape :: Shape,
@@ -37,22 +48,40 @@ type Coordinates = (Int, Int)
 type Offset = Coordinates
 
 data Direction = DLeft | DRight | Down
-  deriving (Eq, Show)
+  deriving (Eq)
 
 type WindGustPattern = String
 
+type CacheKey = (Maybe Shape, Int, Int)
+
+type Cache = ([CacheKey], Int, Int)
+
 width = 7 :: Int
+
+--maxRockCount = 1000000000000 :: Int
 
 maxRockCount = 2022 :: Int
 
 run :: IO ()
 run = do
-  putStrLn "Running Day 17, Part 1 solution..."
+  putStrLn "Running Day 17, Part 2 solution..."
   input <- readInputFile
   let chamber = Chamber [] 0 Nothing
-  let dirList = cycle (intersperse Down (windPattern input) ++ [Down])
-  let result = progress dirList chamber
-  print $ length (chamberFree result)
+  let dirList = intersperse Down (windPattern input) ++ [Down]
+  let (result, cache@(seq, _, _)) = foo dirList chamber
+  print cache
+  let cycleResult@(nonCycle, cycle) = findCycle (last seq) seq
+  print cycleResult
+  let (initRocks, initHeight) = foldl (\(rCount, hCount) (_, r, h) -> (rCount + r, hCount + h)) (0, 0) nonCycle
+  print (initRocks, initHeight)
+  let (rocksPerCycle, heightPerCycle) = foldl (\(rCount, hCount) (_, r, h) -> (rCount + r, hCount + h)) (0, 0) cycle
+  print (rocksPerCycle, heightPerCycle)
+  let remainingRocks = maxRockCount - initRocks
+  let cyclesNeeded = remainingRocks `div` rocksPerCycle
+  let extraRocksNeeded = remainingRocks `mod` rocksPerCycle
+  print cyclesNeeded
+  print extraRocksNeeded
+  print $ initHeight + (heightPerCycle * cyclesNeeded)
   return ()
 
 readInputFile :: IO String
@@ -79,15 +108,45 @@ rockCoordinates (Rock shape (x, y)) =
 rockSequence :: [Rock]
 rockSequence = [Rock Minus (2, 0), Rock Plus (2, 0), Rock BackwardsL (2, 0), Rock VLine (2, 0), Rock Block (2, 0)]
 
-progress :: [Direction] -> Chamber -> Chamber
-progress [] chamber = chamber
-progress dirs@(direction : rest) chamber@Chamber {..} =
+foo :: [Direction] -> Chamber -> (Chamber, Cache)
+foo dirs chamber = runState (progress dirs dirs chamber) ([], 0, 0)
+
+updateCache :: Maybe Int -> Maybe Int
+updateCache Nothing = Just 1
+updateCache (Just x) = Just (x + 1)
+
+findCycle :: CacheKey -> [CacheKey] -> ([CacheKey], [CacheKey])
+findCycle key seq
+  | length chunks > n && lastNEqual n = (concat (take (length chunks - n) chunks), key : last chunks)
+  | otherwise = (seq, [])
+  where
+    n = 2
+    chunks = init $ splitOn [key] seq
+    lastNEqual n = allEqual (drop (length chunks - n) chunks)
+    allEqual [] = True
+    allEqual (x : xs) = all (== x) xs
+
+progress :: [Direction] -> [Direction] -> Chamber -> State Cache Chamber
+progress fullDirList [] chamber = do
+  (chamberSequence, prevHeight, prevRockCount) <- get
+  let key = (rockShape <$> chamberCurrentRock chamber, currentRockCount - prevRockCount, currentTowerHeight - prevHeight)
+  let chamberSequence' = chamberSequence ++ [key]
+  put (chamberSequence', currentTowerHeight, currentRockCount)
+  let (pre, cycles) = findCycle key chamberSequence'
+  if null cycles
+    then progress fullDirList fullDirList chamber
+    else return chamber
+  where
+    currentTowerHeight = length (chamberFree chamber)
+    currentRockCount = chamberRockCount chamber
+progress fullDirList dirs@(direction : rest) chamber@Chamber {..} =
   if chamberRockCount == maxRockCount
-    then chamber
+    then do
+      return chamber
     else case (chamberCurrentRock, direction) of
-      (Nothing, _) -> progress dirs $ nextRock chamber
-      (Just rock, Down) -> progress rest $ moveDown chamber rock
-      (Just rock, hDir) -> progress rest $ moveHorizontally chamber rock hDir
+      (Nothing, _) -> progress fullDirList dirs $ nextRock chamber
+      (Just rock, Down) -> progress fullDirList rest $ moveDown chamber rock
+      (Just rock, hDir) -> progress fullDirList rest $ moveHorizontally chamber rock hDir
 
 moveHorizontally :: Chamber -> Rock -> Direction -> Chamber
 moveHorizontally chamber@Chamber {..} rock direction =

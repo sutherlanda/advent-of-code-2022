@@ -1,19 +1,27 @@
 {-# LANGUAGE RecordWildCards #-}
 
-module Day17.Part1 where
+module Day17.Part2 where
 
 import Data.Bifunctor (bimap, first, second)
+import qualified Data.Hashable as H
 import Data.List (concatMap, findIndex, intersperse)
+import qualified Data.Map.Strict as M
 import Data.Maybe (fromMaybe, isNothing, mapMaybe)
 
 data Shape = Minus | Plus | BackwardsL | VLine | Block
   deriving (Show)
+
+instance H.Hashable Shape where
+  hashWithSalt s shape = H.hashWithSalt s (show shape)
 
 data Rock = Rock
   { rockShape :: Shape,
     rockPosition :: (Int, Int)
   }
   deriving (Show)
+
+instance H.Hashable Rock where
+  hashWithSalt s Rock {..} = H.hashWithSalt s rockShape
 
 data Chamber = Chamber
   { chamberFree :: [[Bool]],
@@ -39,6 +47,9 @@ type Offset = Coordinates
 data Direction = DLeft | DRight | Down
   deriving (Eq, Show)
 
+instance H.Hashable Direction where
+  hashWithSalt s dir = H.hashWithSalt s (show dir)
+
 type WindGustPattern = String
 
 width = 7 :: Int
@@ -47,11 +58,11 @@ maxRockCount = 2022 :: Int
 
 run :: IO ()
 run = do
-  putStrLn "Running Day 17, Part 1 solution..."
+  putStrLn "Running Day 17, Part 2 solution..."
   input <- readInputFile
   let chamber = Chamber [] 0 Nothing
-  let dirList = cycle (intersperse Down (windPattern input) ++ [Down])
-  let result = progress dirList chamber
+  let dirList = intersperse Down (windPattern input) ++ [Down]
+  let result = progress M.empty dirList dirList chamber
   print $ length (chamberFree result)
   return ()
 
@@ -79,15 +90,24 @@ rockCoordinates (Rock shape (x, y)) =
 rockSequence :: [Rock]
 rockSequence = [Rock Minus (2, 0), Rock Plus (2, 0), Rock BackwardsL (2, 0), Rock VLine (2, 0), Rock Block (2, 0)]
 
-progress :: [Direction] -> Chamber -> Chamber
-progress [] chamber = chamber
-progress dirs@(direction : rest) chamber@Chamber {..} =
+fingerPrint :: Rock -> [Direction] -> Int
+fingerPrint rock@Rock {..} directions = H.hash (rock, directions)
+
+updateCache :: Rock -> [Direction] -> M.Map Int Int -> M.Map Int Int
+updateCache rock dirs m = M.insert (fingerPrint rock dirs) current m
+  where
+    current = maybe 0 (+ 1) $ M.lookup key m
+    key = fingerPrint rock dirs
+
+progress :: M.Map Int Int -> [Direction] -> [Direction] -> Chamber -> Chamber
+progress patternCache fullDirs [] chamber = progress patternCache fullDirs fullDirs chamber
+progress patternCache fullDirs dirs@(direction : rest) chamber@Chamber {..} =
   if chamberRockCount == maxRockCount
     then chamber
     else case (chamberCurrentRock, direction) of
-      (Nothing, _) -> progress dirs $ nextRock chamber
-      (Just rock, Down) -> progress rest $ moveDown chamber rock
-      (Just rock, hDir) -> progress rest $ moveHorizontally chamber rock hDir
+      (Nothing, _) -> progress patternCache fullDirs dirs $ nextRock chamber
+      (Just rock, Down) -> progress patternCache fullDirs rest $ moveDown chamber rock
+      (Just rock, hDir) -> progress patternCache fullDirs rest $ moveHorizontally chamber rock hDir
 
 moveHorizontally :: Chamber -> Rock -> Direction -> Chamber
 moveHorizontally chamber@Chamber {..} rock direction =
