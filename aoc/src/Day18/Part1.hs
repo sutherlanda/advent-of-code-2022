@@ -5,10 +5,6 @@ import qualified Data.Set as S
 
 type Cube = (Int, Int, Int)
 
-type CoordinateSet = S.Set Int
-
-type CoordinateSets3D = (CoordinateSet, CoordinateSet, CoordinateSet)
-
 run :: IO ()
 run = do
   putStrLn "Running Day 18, Part 1 solution..."
