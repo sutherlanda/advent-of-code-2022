@@ -1,24 +1,18 @@
 {-# LANGUAGE RecordWildCards #-}
 
---[># LANGUAGE TupleSections #<]
-
 module Day17.Part2 where
 
 import Control.Monad.State
 import Data.Bifunctor (bimap, first, second)
-import qualified Data.Hashable as H
 import Data.List (concatMap, findIndex, intersperse)
 import Data.List.Split (splitOn)
 import qualified Data.Map as M
-import Data.Maybe (fromMaybe, isNothing, mapMaybe)
+import Data.Maybe (fromJust, fromMaybe, isNothing, mapMaybe)
 import qualified Data.Sequence as Seq
 import Debug.Trace (traceShow)
 
 data Shape = Minus | Plus | BackwardsL | VLine | Block
   deriving (Show, Eq, Ord)
-
-instance H.Hashable Shape where
-  hashWithSalt s shape = H.hashWithSalt s (show shape)
 
 data Rock = Rock
   { rockShape :: Shape,
@@ -32,35 +26,22 @@ data Chamber = Chamber
     chamberCurrentRock :: Maybe Rock
   }
 
-instance Show Chamber where
-  show Chamber {..} = concatMap ("\n" ++) (addFloor (addSides (addCurrentRock (map (map toChar) chamberFree))))
-    where
-      toChar free = if free then '.' else '#'
-      addSides lst = map (\s -> '|' : s ++ "|") lst
-      addFloor lst = lst ++ ["+" ++ replicate 7 '-' ++ "+"]
-      addCurrentRock lst = foldl (\lst' (x', y') -> replaceNth y' (replaceNth x' '@' (lst' !! y')) lst') lst (maybe [] rockCoordinates chamberCurrentRock)
-
-replaceNth :: Int -> a -> [a] -> [a]
-replaceNth idx val lst = take idx lst ++ [val] ++ drop (idx + 1) lst
-
 type Coordinates = (Int, Int)
 
 type Offset = Coordinates
 
 data Direction = DLeft | DRight | Down
-  deriving (Eq)
+  deriving (Eq, Show)
 
 type WindGustPattern = String
 
-type CacheKey = (Maybe Shape, Int, Int)
+type CacheKey = (Shape, Direction, [Bool], Int)
 
-type Cache = ([CacheKey], Int, Int)
+type Cache = ([CacheKey], Int)
 
 width = 7 :: Int
 
---maxRockCount = 1000000000000 :: Int
-
-maxRockCount = 2022 :: Int
+maxRockCount = 1000000000000 :: Int
 
 run :: IO ()
 run = do
@@ -68,24 +49,21 @@ run = do
   input <- readInputFile
   let chamber = Chamber [] 0 Nothing
   let dirList = intersperse Down (windPattern input) ++ [Down]
-  let (result, cache@(seq, _, _)) = foo dirList chamber
-  print cache
-  let cycleResult@(nonCycle, cycle) = findCycle (last seq) seq
-  print cycleResult
-  let (initRocks, initHeight) = foldl (\(rCount, hCount) (_, r, h) -> (rCount + r, hCount + h)) (0, 0) nonCycle
-  print (initRocks, initHeight)
-  let (rocksPerCycle, heightPerCycle) = foldl (\(rCount, hCount) (_, r, h) -> (rCount + r, hCount + h)) (0, 0) cycle
-  print (rocksPerCycle, heightPerCycle)
+  let (result, (seq, _)) = foo dirList chamber
+  let cycleResult@(nonCycle, cycle) = findCycle seq
+  let initHeight = foldl (\hCount (_, _, _, h) -> hCount + h) 0 nonCycle
+  let initRocks = length nonCycle
+  let heightPerCycle = foldl (\hCount (_, _, _, h) -> hCount + h) 0 cycle
+  let rocksPerCycle = length cycle
   let remainingRocks = maxRockCount - initRocks
   let cyclesNeeded = remainingRocks `div` rocksPerCycle
   let extraRocksNeeded = remainingRocks `mod` rocksPerCycle
-  print cyclesNeeded
-  print extraRocksNeeded
-  print $ initHeight + (heightPerCycle * cyclesNeeded)
-  return ()
+  let height' = initHeight + (heightPerCycle * cyclesNeeded)
+  let height'' = foldl (\c (_, _, _, h) -> c + h) 0 $ take (extraRocksNeeded + 1) cycle
+  print $ height' + height''
 
 readInputFile :: IO String
-readInputFile = readFile "aoc/src/Day17/test.txt"
+readInputFile = readFile "aoc/src/Day17/input.txt"
 
 windPattern :: String -> [Direction]
 windPattern = mapMaybe cToDir
@@ -109,42 +87,47 @@ rockSequence :: [Rock]
 rockSequence = [Rock Minus (2, 0), Rock Plus (2, 0), Rock BackwardsL (2, 0), Rock VLine (2, 0), Rock Block (2, 0)]
 
 foo :: [Direction] -> Chamber -> (Chamber, Cache)
-foo dirs chamber = runState (progress dirs dirs chamber) ([], 0, 0)
+foo dirs chamber = runState (progress dirs dirs chamber) ([], 0)
 
 updateCache :: Maybe Int -> Maybe Int
 updateCache Nothing = Just 1
 updateCache (Just x) = Just (x + 1)
 
-findCycle :: CacheKey -> [CacheKey] -> ([CacheKey], [CacheKey])
-findCycle key seq
-  | length chunks > n && lastNEqual n = (concat (take (length chunks - n) chunks), key : last chunks)
-  | otherwise = (seq, [])
+findCycle :: Eq a => [a] -> ([a], [a])
+findCycle xxs = fCycle xxs xxs
   where
-    n = 2
-    chunks = init $ splitOn [key] seq
-    lastNEqual n = allEqual (drop (length chunks - n) chunks)
-    allEqual [] = True
-    allEqual (x : xs) = all (== x) xs
+    fCycle (x : xs) (_ : y : ys)
+      | x == y = fStart xxs xs
+      | otherwise = fCycle xs ys
+    fCycle _ _ = (xxs, []) -- not cyclic
+    fStart (x : xs) (y : ys)
+      | x == y = ([], x : fLength x xs)
+      | otherwise = let (as, bs) = fStart xs ys in (x : as, bs)
+    fStart _ _ = (xxs, [])
+    fLength x (y : ys)
+      | x == y = []
+      | otherwise = y : fLength x ys
+    fLength x [] = []
 
 progress :: [Direction] -> [Direction] -> Chamber -> State Cache Chamber
-progress fullDirList [] chamber = do
-  (chamberSequence, prevHeight, prevRockCount) <- get
-  let key = (rockShape <$> chamberCurrentRock chamber, currentRockCount - prevRockCount, currentTowerHeight - prevHeight)
-  let chamberSequence' = chamberSequence ++ [key]
-  put (chamberSequence', currentTowerHeight, currentRockCount)
-  let (pre, cycles) = findCycle key chamberSequence'
-  if null cycles
-    then progress fullDirList fullDirList chamber
-    else return chamber
-  where
-    currentTowerHeight = length (chamberFree chamber)
-    currentRockCount = chamberRockCount chamber
-progress fullDirList dirs@(direction : rest) chamber@Chamber {..} =
-  if chamberRockCount == maxRockCount
+progress fullDirList [] chamber = progress fullDirList fullDirList chamber
+progress fullDirList dirs@(direction : rest) chamber =
+  if chamberRockCount chamber == maxRockCount
     then do
       return chamber
-    else case (chamberCurrentRock, direction) of
-      (Nothing, _) -> progress fullDirList dirs $ nextRock chamber
+    else case (chamberCurrentRock chamber, direction) of
+      (Nothing, _) -> do
+        (sequence, prevHeight) <- get
+        let newHeight = length (chamberFree chamber)
+        let chamber' = nextRock chamber
+        let rock@Rock {..} = fromJust $ chamberCurrentRock chamber'
+        let key = (rockShape, direction, concat (take 10 (chamberFree chamber)), newHeight - prevHeight)
+        let sequence' = sequence ++ [key]
+        put (sequence', newHeight)
+        let (_, cycles) = findCycle sequence'
+        if null cycles
+          then progress fullDirList dirs chamber'
+          else return chamber'
       (Just rock, Down) -> progress fullDirList rest $ moveDown chamber rock
       (Just rock, hDir) -> progress fullDirList rest $ moveHorizontally chamber rock hDir
 
@@ -184,3 +167,6 @@ rockHeight :: Rock -> Int
 rockHeight rock@Rock {..} = maximum yCoords - minimum yCoords + 1
   where
     yCoords = map snd (rockCoordinates rock)
+
+replaceNth :: Int -> a -> [a] -> [a]
+replaceNth idx val lst = take idx lst ++ [val] ++ drop (idx + 1) lst
